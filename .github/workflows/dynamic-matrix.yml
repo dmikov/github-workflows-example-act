@@ -1,0 +1,71 @@
+name: Dynamic Matrix Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      alert:
+        description: 'Send email if workflow fails'
+        default: false
+        required: false
+        type: boolean
+
+env:
+  NEXUS_REPO: nexus.swimlane.io:5000
+  GIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
+  DOT_NET_BASE: swimlane/swimlane-base-dotnet-6.0-sdk
+  SWIMLANE_VERSION: 10.8.0
+
+jobs:
+
+  create-matrix:
+    runs-on: self-hosted
+    outputs:
+      matrix: ${{ steps.matrix.outputs.content }}
+    steps:
+      - id: matrix
+        env:       
+          MATRIX: '{
+              "image": ["swimlane/swimlane-backup","swimlane/swimlane-api","swimlane/swimlane-tasks","swimlane/swimlane-reports","swimlane/swimlane-web"],
+              "include": [
+                {"image": "swimlane/swimlane-web","arguments": ["-f projects/web/Dockerfile", "--build-arg NPM_TOKEN=905435RGERR87"], "working-directory": "."},
+                {"image": "swimlane/swimlane-reports","arguments": [],"working-directory": "./projects/reports"},
+                {"image": "swimlane/swimlane-backup","arguments": [],"working-directory": "./projects/backup"},
+                {"image": "swimlane/swimlane-api","working-directory": "./projects/dotnet",
+                  "arguments": [
+                    "--build-arg SWIMLANE_IMAGE_BUILD=${{ env.NEXUS_REPO }}/${{ env.DOT_NET_BASE }}:${{ env.SWIMLANE_VERSION }}",
+                    "--build-arg SWIMLANE_IMAGE_RUNTIME=${{ env.NEXUS_REPO }}/${{ env.DOT_NET_BASE }}:${{ env.SWIMLANE_VERSION }}",
+                    "--build-arg BUILD_CONFIGURATION=Release",
+                    "--build-arg GIT_HASH=${{ env.GIT_HASH }}",
+                    "--build-arg SEMVER=${{ env.SWIMLANE_VERSION }}",
+                    "-f Api/Dockerfile"
+                  ]
+                },
+                {"image": "swimlane/swimlane-tasks","working-directory": "./projects/dotnet",
+                  "arguments": [
+                    "--build-arg SWIMLANE_IMAGE_BUILD=${{ env.NEXUS_REPO }}/${{ env.DOT_NET_BASE }}:${{ env.SWIMLANE_VERSION }}",
+                    "--build-arg SWIMLANE_IMAGE_RUNTIME=${{ env.NEXUS_REPO }}/${{ env.DOT_NET_BASE }}:${{ env.SWIMLANE_VERSION }}",
+                    "--build-arg BUILD_CONFIGURATION=Release",
+                    "--build-arg GIT_HASH=${{ env.GIT_HASH }}",
+                    "--build-arg SEMVER=${{ env.SWIMLANE_VERSION }}",
+                    "-f Tasks/Dockerfile"
+                  ]
+                }
+              ]
+            }'
+        run: |
+          LOCAL_MATRIX='${{ toJson(env.MATRIX) }}'
+          echo ::set-output name=content::${LOCAL_MATRIX}
+
+  read-matrix:
+    needs:
+      - create-matrix
+    runs-on: self-hosted
+    strategy:
+      max-parallel: 5
+      fail-fast: false
+      matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
+      
+    steps:
+      - name: Type
+        run: |
+          echo ${{ matrix.image }}
