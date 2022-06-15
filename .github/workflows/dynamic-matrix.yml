@@ -22,6 +22,9 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.content }}
     steps:
+      - run: |
+            echo "Dmitriy"
+            echo "Krasnikov"
       - id: matrix
         env:       
           MATRIX: '{
@@ -53,8 +56,9 @@ jobs:
               ]
             }'
         run: |
-          LOCAL_MATRIX='${{ toJson(env.MATRIX) }}'
-          echo ::set-output name=content::${LOCAL_MATRIX}
+              echo "${{ env.MATRIX }}"
+              LOCAL_MATRIX='${{ env.MATRIX }}'
+              echo "::set-output name=content::${LOCAL_MATRIX}"
 
   read-matrix:
     needs:
@@ -63,9 +67,9 @@ jobs:
     strategy:
       max-parallel: 5
       fail-fast: false
-      matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
+      matrix: ${{ needs.create-matrix.outputs.matrix }}
       
     steps:
       - name: Type
         run: |
-          echo ${{ matrix.image }}
+          echo "${{ matrix.image }}"
