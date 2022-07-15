@@ -1,0 +1,23 @@
+name: Bitwarded login
+
+on:
+  workflow_dispatch:
+
+env:
+  BW_CLIENTID: ${{ secrets.BW_CLIENTID }}
+  BW_CLIENTSECRET: ${{ secrets.BW_CLIENTSECRET }}
+  BW_PASSWORD: ${{ secrets.BW_PASSWORD }}
+
+jobs:
+  read-all:
+    runs-on: self-hosted
+    env:
+      JOB_LEVEL: job-level-variable
+    steps:
+      - name: Login Bitwarden
+        run: |
+            bw login --apikey
+            session_cmd=$(bw unlock --passwordenv BW_PASSWORD  | grep "$ export BW_SESSION")
+            echo "$session_cmd"
+            ${session_cmd:1}
+            bw list items
